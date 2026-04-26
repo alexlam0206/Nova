@@ -1,59 +1,86 @@
 import SwiftUI
-import SwiftData
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
+    private let miniPlayerHeight: CGFloat = 60
+    @State private var expandMiniPlayer: Bool = false
+    @State private var dragOffset: CGFloat = 0
+    @Namespace private var animation
 
     var body: some View {
-        NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
+        ZStack {
+            AnimatedBackground()
+
+            TabbarView(safeAreaBottomPadding: miniPlayerHeight)
+                .overlay(alignment: .bottom) {
+                    MiniPlayerView()
+                        .matchedTransitionSafe(id: "MINIPLAYER", in: animation)
+                        .onTapGesture {
+                            expandMiniPlayer.toggle()
+                        }
+                        .offset(y: -miniPlayerHeight)
+                        .padding(.horizontal, 15)
+                }
+                .ignoresSafeArea(.keyboard, edges: .all)
+                .fullScreenCover(isPresented: $expandMiniPlayer) {
+                    GeometryReader { geo in
+                        ExpandedMiniPlayerContent(dragOffset: $dragOffset,
+                                                   expandMiniPlayer: $expandMiniPlayer,
+                                                   animation: animation)
+                            .padding(.top, geo.safeAreaInsets.top + 8)
+                            .ignoresSafeArea()
                     }
                 }
-                .onDelete(perform: deleteItems)
-            }
-#if os(macOS)
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200)
-#endif
-            .toolbar {
-#if os(iOS)
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
+        }
+    }
+}
+
+private struct ExpandedMiniPlayerContent: View {
+    @Binding var dragOffset: CGFloat
+    @Binding var expandMiniPlayer: Bool
+    var animation: Namespace.ID
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Capsule()
+                .fill(.primary.opacity(0.6))
+                .frame(width: 35, height: 3)
+
+            HStack(spacing: 0) {
+                PlayerInfo(size: .init(width: 80, height: 80))
+                Spacer(minLength: 0)
+
+                Group {
+                    Button(action: {}) { Image(systemName: "star.circle.fill") }
+                    Button(action: {}) { Image(systemName: "ellipsis.circle.fill") }
                 }
-#endif
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
+                .font(.title)
+                .foregroundStyle(.primary, .primary.opacity(0.1))
+            }
+            .padding(.horizontal, 15)
+
+            Spacer()
+        }
+        .offset(y: dragOffset)
+        .gesture(
+            DragGesture()
+                .onChanged { value in
+                    dragOffset = max(0, value.translation.height)
+                }
+                .onEnded { value in
+                    let shouldClose = value.translation.height > 120 || value.predictedEndTranslation.height > 150
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        if shouldClose {
+                            expandMiniPlayer = false
+                        }
+                        dragOffset = 0
                     }
                 }
-            }
-        } detail: {
-            Text("Select an item")
-        }
-    }
-
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
-            }
-        }
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(.background)
     }
 }
 
 #Preview {
     ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
 }
