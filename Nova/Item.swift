@@ -1,10 +1,3 @@
-//
-//  Item.swift
-//  Nova
-//
-//  Created by Alex Lam on 26/4/2026.
-//
-
 import Foundation
 import SwiftData
 

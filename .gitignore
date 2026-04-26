@@ -1,0 +1,21 @@
+# macOS
+.DS_Store
+
+# reference folder
+reference/
+
+# Xcode / Swift
+DerivedData/
+build/
+xcuserdata/
+*.xcuserdatad/
+*.xcworkspace
+*.xcuserstate
+
+# IDE
+.idea/
+.vscode/
+
+# Thumbs/db
+Thumbs.db
+

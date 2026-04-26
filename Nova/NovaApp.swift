@@ -1,10 +1,3 @@
-//
-//  NovaApp.swift
-//  Nova
-//
-//  Created by Alex Lam on 26/4/2026.
-//
-
 import SwiftUI
 import SwiftData
 
