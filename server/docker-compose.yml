@@ -26,9 +26,8 @@ services:
     volumes:
       - ./:/usr/src/app
       - ./storage:/data/storage
+    env_file: .env
     environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=${REDIS_URL}
       - STORAGE_PATH=/data/storage
     depends_on:
       - db
