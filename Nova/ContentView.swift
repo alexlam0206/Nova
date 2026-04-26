@@ -97,6 +97,7 @@ private struct ExpandedMiniPlayerContent: View {
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.background)
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
     }
 }
 
