@@ -15,7 +15,10 @@ struct ContentView: View {
                     MiniPlayerView()
                         .matchedTransitionSafe(id: "MINIPLAYER", in: animation)
                         .onTapGesture {
-                            expandMiniPlayer.toggle()
+                            withAnimation {
+                                dragOffset = 0
+                                expandMiniPlayer = true
+                            }
                         }
                         .offset(y: -miniPlayerHeight)
                         .padding(.horizontal, 15)
@@ -28,6 +31,24 @@ struct ContentView: View {
                                                    animation: animation)
                             .padding(.top, geo.safeAreaInsets.top + 8)
                             .ignoresSafeArea()
+                            .gesture(
+                                DragGesture()
+                                    .onChanged { value in
+                                        dragOffset = max(0, value.translation.height)
+                                    }
+                                    .onEnded { value in
+                                        let shouldClose = value.translation.height > 120 || value.predictedEndTranslation.height > 150
+                                        if shouldClose {
+                                            withAnimation {
+                                                expandMiniPlayer = false
+                                            }
+                                        } else {
+                                            withAnimation {
+                                                dragOffset = 0
+                                            }
+                                        }
+                                    }
+                            )
                     }
                 }
         }
@@ -68,12 +89,10 @@ private struct ExpandedMiniPlayerContent: View {
                 }
                 .onEnded { value in
                     let shouldClose = value.translation.height > 120 || value.predictedEndTranslation.height > 150
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                        if shouldClose {
-                            expandMiniPlayer = false
-                        }
-                        dragOffset = 0
+                    if shouldClose {
+                        expandMiniPlayer = false
                     }
+                    dragOffset = 0
                 }
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
