@@ -6,7 +6,7 @@ struct MiniPlayerView: View {
     var body: some View {
         GlassContainer(cornerRadius: height / 2) {
             HStack(spacing: 15) {
-                PlayerInfo(size: .init(width: 30, height: 30))
+                PlayerInfo(size: .init(width: 48, height: 48))
 
                 Spacer(minLength: 0)
 

@@ -5,12 +5,14 @@ struct ContentView: View {
     @State private var expandMiniPlayer: Bool = false
     @State private var dragOffset: CGFloat = 0
     @Namespace private var animation
+    @StateObject private var player = PlayerManager.shared
 
     var body: some View {
         ZStack {
             AnimatedBackground()
 
             TabbarView(safeAreaBottomPadding: miniPlayerHeight)
+                .environmentObject(player)
                 .overlay(alignment: .bottom) {
                     MiniPlayerView()
                         .matchedTransitionSafe(id: "MINIPLAYER", in: animation)
@@ -29,6 +31,7 @@ struct ContentView: View {
                         ExpandedMiniPlayerContent(dragOffset: $dragOffset,
                                                    expandMiniPlayer: $expandMiniPlayer,
                                                    animation: animation)
+                            .environmentObject(player)
                             .padding(.top, geo.safeAreaInsets.top + 8)
                             .ignoresSafeArea()
                             .gesture(
@@ -52,6 +55,7 @@ struct ContentView: View {
                     }
                 }
         }
+        .environmentObject(player)
     }
 }
 
@@ -59,6 +63,8 @@ private struct ExpandedMiniPlayerContent: View {
     @Binding var dragOffset: CGFloat
     @Binding var expandMiniPlayer: Bool
     var animation: Namespace.ID
+    @EnvironmentObject private var player: PlayerManager
+    @State private var showMore: Bool = false
 
     var body: some View {
         VStack(spacing: 10) {
@@ -71,8 +77,13 @@ private struct ExpandedMiniPlayerContent: View {
                 Spacer(minLength: 0)
 
                 Group {
-                    Button(action: {}) { Image(systemName: "star.circle.fill") }
-                    Button(action: {}) { Image(systemName: "ellipsis.circle.fill") }
+                    Button(action: { player.toggleFavorite() }) {
+                        Image(systemName: player.isFavorited ? "star.fill" : "star")
+                    }
+
+                    Button(action: { showMore = true }) {
+                        Image(systemName: "ellipsis.circle.fill")
+                    }
                 }
                 .font(.title)
                 .foregroundStyle(.primary, .primary.opacity(0.1))
@@ -80,6 +91,15 @@ private struct ExpandedMiniPlayerContent: View {
             .padding(.horizontal, 15)
 
             Spacer()
+        }
+        .confirmationDialog("More Options", isPresented: $showMore) {
+            Button("Add to Playlist") {
+                // TODO: implement playlist action
+            }
+            Button("Share") {
+                // TODO: implement share action
+            }
+            Button("Cancel", role: .cancel) {}
         }
         .offset(y: dragOffset)
         .gesture(
