@@ -47,3 +47,16 @@ func importYouTubeFromURL(url: String) async throws {
         throw APIError.networkError("Server error")
     }
 }
+
+func searchSongs(query: String) async throws -> [SongDTO] {
+    let baseURL = "http://localhost:3000"
+    guard let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+          let url = URL(string: "\(baseURL)/api/search?q=\(encoded)") else {
+        throw APIError.invalidURL
+    }
+    let (data, resp) = try await URLSession.shared.data(from: url)
+    guard let httpResp = resp as? HTTPURLResponse, httpResp.statusCode == 200 else {
+        throw APIError.networkError("Server error")
+    }
+    return try JSONDecoder().decode([SongDTO].self, from: data)
+}

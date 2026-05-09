@@ -120,31 +120,43 @@ struct SearchContent: View {
     var padding: CGFloat
     @State private var query = ""
     @State private var isImporting = false
+    @State private var isSearching = false
+    @State private var searchResults: [SongDTO] = []
     @State private var alertMessage = ""
     @State private var showAlert = false
 
     var body: some View {
         NavigationStack {
             List {
-                if isImporting {
+                if isImporting || isSearching {
                     HStack {
                         ProgressView()
-                        Text("Importing...")
+                        Text(isImporting ? "Importing..." : "Searching...")
                             .foregroundStyle(.secondary)
                     }
                 }
-                Section {
-                    Text("Paste a YouTube URL to import a song")
-                        .foregroundStyle(.secondary)
-                        .font(.subheadline)
+
+                if !searchResults.isEmpty {
+                    Section("Results") {
+                        ForEach(searchResults) { dto in
+                            SearchResultRow(dto: dto)
+                                .onTapGesture { addToQueue(dto) }
+                        }
+                    }
+                }
+
+                if searchResults.isEmpty && query.isEmpty {
+                    Section {
+                        Text("Search songs or paste a YouTube URL")
+                            .foregroundStyle(.secondary)
+                            .font(.subheadline)
+                    }
                 }
             }
             .listStyle(.plain)
             .navigationTitle("Search")
             .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Song or YouTube URL")
-            .onSubmit(of: .search) {
-                handleSearch()
-            }
+            .onSubmit(of: .search) { handleSearch() }
             .alert("Notice", isPresented: $showAlert) {
                 Button("OK", role: .cancel) {}
             } message: {
@@ -156,8 +168,7 @@ struct SearchContent: View {
 
     private var isYouTubeURL: Bool {
         let patterns = ["youtube.com", "youtu.be"]
-        let lower = query.lowercased()
-        return patterns.contains { lower.contains($0) }
+        return patterns.contains { query.lowercased().contains($0) }
     }
 
     private func handleSearch() {
@@ -165,9 +176,31 @@ struct SearchContent: View {
         if isYouTubeURL {
             importYouTubeSong(query)
         } else {
-            alertMessage = "Text search coming soon"
-            showAlert = true
-            query = ""
+            searchText(query)
+        }
+    }
+
+    private func searchText(_ q: String) {
+        isSearching = true
+        searchResults = []
+        Task {
+            do {
+                let results = try await searchSongs(query: q)
+                await MainActor.run {
+                    isSearching = false
+                    searchResults = results
+                    if results.isEmpty {
+                        alertMessage = "No results"
+                        showAlert = true
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    isSearching = false
+                    alertMessage = error.localizedDescription
+                    showAlert = true
+                }
+            }
         }
     }
 
@@ -188,6 +221,55 @@ struct SearchContent: View {
                     alertMessage = error.localizedDescription
                     showAlert = true
                 }
+            }
+        }
+    }
+
+    private func addToQueue(_ dto: SongDTO) {
+        let song = Song(
+            title: dto.trackName,
+            artist: dto.artistName,
+            duration: TimeInterval(dto.duration ?? 0),
+            artworkURL: dto.coverUrl.flatMap { URL(string: $0) },
+            audioURL: dto.source.flatMap { URL(string: $0) }
+        )
+        PlayerManager.shared.addToQueue(song)
+        alertMessage = "Added: \(dto.trackName)"
+        showAlert = true
+        query = ""
+        searchResults = []
+    }
+}
+
+struct SearchResultRow: View {
+    let dto: SongDTO
+    var body: some View {
+        HStack(spacing: 12) {
+            if let coverUrl = dto.coverUrl {
+                RemoteImageView(urlString: coverUrl, width: 48, height: 48)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+            } else {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.gray.opacity(0.15))
+                    .frame(width: 48, height: 48)
+                    .overlay {
+                        Image(systemName: "music.note")
+                            .foregroundStyle(.secondary)
+                    }
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(dto.trackName)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                Text(dto.artistName)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            if dto.source != nil {
+                Image(systemName: "link")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }
