@@ -1,6 +1,6 @@
 import SwiftUI
 import Combine
-import UIKit
+import AVFoundation
 
 public struct Song: Identifiable, Equatable {
     public let id: UUID
@@ -8,24 +8,36 @@ public struct Song: Identifiable, Equatable {
     public var artist: String
     public var duration: TimeInterval
     public var artworkURL: URL?
+    public var audioURL: URL?
     public var lyrics: [LyricLine]
 
-    public init(id: UUID = .init(), title: String, artist: String, duration: TimeInterval, artworkURL: URL? = nil, lyrics: [LyricLine] = []) {
+    public init(id: UUID = .init(), title: String, artist: String, duration: TimeInterval,
+                artworkURL: URL? = nil, audioURL: URL? = nil, lyrics: [LyricLine] = []) {
         self.id = id
         self.title = title
         self.artist = artist
         self.duration = duration
         self.artworkURL = artworkURL
+        self.audioURL = audioURL
         self.lyrics = lyrics
     }
 
-    // MARK: - Demo Data
     static let samples: [Song] = [
-        Song(title: "Blinding Lights", artist: "The Weeknd", duration: 200, artworkURL: URL(string: "https://cataas.com/cat?width=600&height=600")),
-        Song(title: "Levitating", artist: "Dua Lipa", duration: 203, artworkURL: URL(string: "https://cataas.com/cat?width=600&height=600")),
-        Song(title: "Stay", artist: "Kid LAROI", duration: 141, artworkURL: URL(string: "https://cataas.com/cat?width=600&height=600")),
-        Song(title: "good 4 u", artist: "Olivia Rodrigo", duration: 178, artworkURL: URL(string: "https://cataas.com/cat?width=600&height=600")),
-        Song(title: "Heat Waves", artist: "Glass Animals", duration: 239, artworkURL: URL(string: "https://cataas.com/cat?width=600&height=600")),
+        Song(title: "Blinding Lights", artist: "The Weeknd", duration: 200,
+             artworkURL: URL(string: "https://cataas.com/cat?width=600&height=600"),
+             audioURL: URL(string: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3")),
+        Song(title: "Levitating", artist: "Dua Lipa", duration: 203,
+             artworkURL: URL(string: "https://cataas.com/cat?width=600&height=600"),
+             audioURL: URL(string: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3")),
+        Song(title: "Stay", artist: "Kid LAROI", duration: 141,
+             artworkURL: URL(string: "https://cataas.com/cat?width=600&height=600"),
+             audioURL: URL(string: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3")),
+        Song(title: "good 4 u", artist: "Olivia Rodrigo", duration: 178,
+             artworkURL: URL(string: "https://cataas.com/cat?width=600&height=600"),
+             audioURL: URL(string: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3")),
+        Song(title: "Heat Waves", artist: "Glass Animals", duration: 239,
+             artworkURL: URL(string: "https://cataas.com/cat?width=600&height=600"),
+             audioURL: URL(string: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3")),
     ]
 }
 
@@ -46,14 +58,15 @@ final class PlayerManager: ObservableObject {
     @Published var artwork: UIImage? = nil
     @Published var placeholderArtwork: UIImage? = nil
     @Published var currentLyric: String? = nil
+    @Published var isFavorited: Bool = false
 
-    private var timerCancellable: AnyCancellable?
-    private var artworkTask: Task<Void, Never>?
-    private let tickInterval: TimeInterval = 0.5
+    private var avPlayer: AVPlayer? = nil
+    private var timeObserver: Any? = nil
 
     private init() {}
 
     func setQueue(_ songs: [Song], startAt index: Int = 0, playImmediately: Bool = false) {
+        cleanupPlayer()
         queue = songs
         if queue.indices.contains(index) {
             currentSong = queue.remove(at: index)
@@ -64,8 +77,7 @@ final class PlayerManager: ObservableObject {
             progress = 0
             artwork = nil
         }
-        isPlaying = playImmediately
-        if isPlaying { startTimer() } else { stopTimer() }
+        if playImmediately { play() }
     }
 
     func addToQueue(_ song: Song) {
@@ -77,19 +89,16 @@ final class PlayerManager: ObservableObject {
         }
     }
 
-    // Playback control
     func play() {
-        guard currentSong != nil else {
-            next()
-            return
-        }
+        guard currentSong != nil else { next(); return }
+        if avPlayer == nil { loadAVPlayer() }
+        avPlayer?.play()
         isPlaying = true
-        startTimer()
     }
 
     func pause() {
+        avPlayer?.pause()
         isPlaying = false
-        stopTimer()
     }
 
     func togglePlayPause() {
@@ -97,67 +106,86 @@ final class PlayerManager: ObservableObject {
     }
 
     func next() {
+        cleanupPlayer()
         if !queue.isEmpty {
             currentSong = queue.removeFirst()
             progress = 0
             loadArtwork()
-            if isPlaying { startTimer() }
+            if isPlaying { play() }
             updateLyrics()
             return
         }
-
-        // no more songs then stop
         stop()
     }
 
     func previous() {
-        // loop current song
         progress = 0
+        avPlayer?.seek(to: .zero)
         updateLyrics()
     }
 
     func stop() {
+        cleanupPlayer()
         isPlaying = false
         progress = 0
-        stopTimer()
     }
 
     func seek(to time: TimeInterval) {
-        guard let duration = currentSong?.duration else { return }
-        progress = min(max(0, time), duration)
-        updateLyrics()
+        let cmTime = CMTime(seconds: time, preferredTimescale: 600)
+        avPlayer?.seek(to: cmTime)
+        progress = time
     }
 
-    // ART!
-    func loadArtwork() {
+    func toggleFavorite() {
+        isFavorited.toggle()
+    }
+
+    private func loadAVPlayer() {
+        guard let url = currentSong?.audioURL else { return }
+        cleanupPlayer()
+
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+            try AVAudioSession.sharedInstance().setActive(true)
+        } catch {
+            print("audio session error: \(error)")
+        }
+
+        avPlayer = AVPlayer(url: url)
+        let interval = CMTime(seconds: 0.5, preferredTimescale: 600)
+        timeObserver = avPlayer?.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
+            self?.progress = time.seconds
+        }
+    }
+
+    private func cleanupPlayer() {
+        if let obs = timeObserver { avPlayer?.removeTimeObserver(obs); timeObserver = nil }
+        avPlayer?.pause()
+        avPlayer = nil
+    }
+
+    private func loadArtwork() {
         artworkTask?.cancel()
         artwork = nil
-        guard let url = currentSong?.artworkURL else {
-            ensurePlaceholderLoaded()
-            return
-        }
+        guard let url = currentSong?.artworkURL else { ensurePlaceholderLoaded(); return }
 
         artworkTask = Task { [weak self] in
             do {
                 let (data, _) = try await URLSession.shared.data(from: url)
                 if let img = UIImage(data: data) {
-                    await MainActor.run {
-                        self?.artwork = img
-                    }
+                    await MainActor.run { self?.artwork = img }
                 }
             } catch {
-                // ignore failures silently
-                await MainActor.run {
-                    self?.ensurePlaceholderLoaded()
-                }
+                await MainActor.run { self?.ensurePlaceholderLoaded() }
             }
         }
     }
 
     func ensurePlaceholderLoaded() {
-        guard placeholderArtwork == nil else { return }
-        // Load a single placeholder cat image and cache it for both mini and expanded
-        artworkTask?.cancel()
+        guard placeholderArtwork == nil else {
+            if artwork == nil { artwork = placeholderArtwork }
+            return
+        }
         artworkTask = Task { [weak self] in
             do {
                 let url = URL(string: "https://cataas.com/cat?width=600&height=600")!
@@ -165,62 +193,21 @@ final class PlayerManager: ObservableObject {
                 if let img = UIImage(data: data) {
                     await MainActor.run {
                         self?.placeholderArtwork = img
-                        // only set artwork if no real artwork is present
-                        if self?.artwork == nil {
-                            self?.artwork = img
-                        }
+                        if self?.artwork == nil { self?.artwork = img }
                     }
                 }
-            } catch {
-                // ignore
-            }
+            } catch { }
         }
     }
 
-    //  Lyric with realtime  SYNC
-    // https://www.apple.com/newsroom/2022/12/apple-introduces-apple-music-sing/
     private func updateLyrics() {
         guard let lines = currentSong?.lyrics, !lines.isEmpty else {
             currentLyric = nil
             return
         }
-
-        let idx = (lines.indices).last { lines[$0].time <= progress } ?? nil
+        let idx = (lines.indices).last { lines[$0].time <= progress }
         currentLyric = idx.map { lines[$0].text }
     }
 
-
-    private func startTimer() {
-        stopTimer()
-        timerCancellable = Timer.publish(every: tickInterval, on: .main, in: .common)
-            .autoconnect()
-            .sink { [weak self] _ in
-                self?.tick()
-            }
-    }
-
-    private func stopTimer() {
-        timerCancellable?.cancel()
-        timerCancellable = nil
-    }
-
-    private func tick() {
-        guard isPlaying, let duration = currentSong?.duration else { return }
-        progress += tickInterval
-        if progress >= duration {
-            next()
-        }
-        updateLyrics()
-    }
-}
-
-
-// /Helpers
-extension Collection where Index == Int {
-    fileprivate func last(where predicate: (Element) -> Bool) -> Int? {
-        for i in stride(from: count - 1, through: 0, by: -1) {
-            if predicate(self[i]) { return i }
-        }
-        return nil
-    }
+    private var artworkTask: Task<Void, Never>?
 }

@@ -2,7 +2,8 @@ import SwiftUI
 
 struct MiniPlayerView: View {
     private let height: CGFloat = 60
-    
+    @EnvironmentObject private var player: PlayerManager
+
     var body: some View {
         GlassContainer(cornerRadius: height / 2) {
             HStack(spacing: 15) {
