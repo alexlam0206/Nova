@@ -5,16 +5,17 @@ struct PlayerInfo: View {
     @EnvironmentObject private var player: PlayerManager
     var body: some View {
         HStack(spacing: 12) {
-            RemoteImageView(urlString: player.coverURLString, width: size.width, height: size.height)
+            RemoteImageView(urlString: player.currentSong?.artworkURL?.absoluteString, width: size.width, height: size.height)
                 .clipShape(RoundedRectangle(cornerRadius: size.height / 4, style: .continuous))
-            
+
             VStack(alignment: .leading, spacing: 6) {
-                Text("Some Apple Music Title")
+                Text(player.currentSong?.title ?? "Not Playing")
                     .font(.callout)
-                
-                Text("Some Artist Name")
+                    .foregroundStyle(.primary)
+
+                Text(player.currentSong?.artist ?? "—")
                     .font(.caption2)
-                    .foregroundStyle(.gray)
+                    .foregroundStyle(.secondary)
             }
             .lineLimit(1)
         }

@@ -10,14 +10,14 @@ struct MiniPlayerView: View {
 
                 Spacer(minLength: 0)
 
-                Button(action: {}) {
-                    Image(systemName: "play.fill")
+                Button(action: { player.togglePlayPause() }) {
+                    Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                         .foregroundStyle(.primary)
                         .frame(width: 28, height: 28)
                 }
                 .padding(.trailing, 8)
 
-                Button(action: {}) {
+                Button(action: { player.next() }) {
                     Image(systemName: "forward.fill")
                         .foregroundStyle(.primary)
                         .frame(width: 28, height: 28)
