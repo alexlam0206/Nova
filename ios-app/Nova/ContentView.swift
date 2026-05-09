@@ -196,19 +196,6 @@ private struct ExpandedMiniPlayerContent: View {
         }
         .padding(.horizontal, 16)
         .offset(y: dragOffset)
-        .gesture(
-            DragGesture()
-                .onChanged { value in
-                    dragOffset = max(0, value.translation.height)
-                }
-                .onEnded { value in
-                    let shouldClose = value.translation.height > 120 || value.predictedEndTranslation.height > 150
-                    if shouldClose {
-                        expandMiniPlayer = false
-                    }
-                    dragOffset = 0
-                }
-        )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.background)
         .confirmationDialog("More Options", isPresented: $showMore) {
