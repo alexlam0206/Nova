@@ -7,62 +7,65 @@ struct AnimatedBackground: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                firstImage(geometry)
-                image(geometry)
-                image(geometry)
-                image(geometry)
-                VisualEffect(effect: UIBlurEffect(style: .light))
-                VisualEffect(effect: UIBlurEffect(style: .light))
+                LinearGradient(
+                    colors: [
+                        Color(hex: "1a0a2e"),
+                        Color(hex: "16213e"),
+                        Color(hex: "0f3460"),
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+
+                Circle()
+                    .fill(Color(hex: "e94560").opacity(0.15))
+                    .frame(width: 400, height: 400)
+                    .blur(radius: 60)
+                    .offset(x: animation ? 100 : -50, y: animation ? -80 : 50)
+
+                Circle()
+                    .fill(Color(hex: "533483").opacity(0.2))
+                    .frame(width: 300, height: 300)
+                    .blur(radius: 50)
+                    .offset(x: animation ? -80 : 60, y: animation ? 100 : -30)
+
                 VisualEffect(effect: UIBlurEffect(style: .dark))
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
         }
         .edgesIgnoringSafeArea(.all)
         .onAppear {
-            withAnimation(Animation.linear(duration: 50).repeatForever()) {
+            withAnimation(Animation.easeInOut(duration: 8).repeatForever(autoreverses: true)) {
                 animation.toggle()
             }
         }
     }
+}
 
-    func image(_ geometry: GeometryProxy) -> some View {
-        Image("image")
-            .resizable()
-            .frame(
-                width: randomFrame(geometry.size.width),
-                height: randomFrame(geometry.size.width)
-            )
-            .scaleEffect(randomCGFloat(in: 1...2.5))
-            .opacity(0.5)
-            .rotationEffect(.degrees(randomDouble(in: -360...360)), anchor: .center)
-            .offset(x: randomCGFloat(in: -300...300), y: randomCGFloat(in: -300...300))
-            .blendMode(.lighten)
-            .saturation(randomDouble(in: 0.4...1.4))
-            .contrast(2)
-    }
-
-    func firstImage(_ geometry: GeometryProxy) -> some View {
-        Image("image")
-            .resizable()
-            .brightness(-0.5)
-            .rotationEffect(.degrees(randomDouble(in: -360...360)), anchor: .center)
-            .frame(width: geometry.size.height*2, height: geometry.size.height*2)
-    }
-
-    func randomFrame(_ base: CGFloat) -> CGFloat {
-        let randomNumber = animation ? CGFloat.random(in: -100...300) : CGFloat.random(in: -100...300)
-        let frame = base + randomNumber
-        return frame
-    }
-
-    func randomCGFloat(in range: ClosedRange<CGFloat>) -> CGFloat {
-        let randomNumber = animation ? CGFloat.random(in: range) : CGFloat.random(in: range)
-        return randomNumber
-    }
-
-    func randomDouble(in range: ClosedRange<Double>) -> Double {
-        let randomNumber = animation ? Double.random(in: range) : Double.random(in: range)
-        return randomNumber
+// MARK: - Color Hex Extension
+extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 3:
+            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6:
+            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8:
+            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (a, r, g, b) = (255, 0, 0, 0)
+        }
+        self.init(
+            .sRGB,
+            red: Double(r) / 255,
+            green: Double(g) / 255,
+            blue: Double(b) / 255,
+            opacity: Double(a) / 255
+        )
     }
 }
 
