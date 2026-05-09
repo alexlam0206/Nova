@@ -1,4 +1,16 @@
+import AVKit
 import SwiftUI
+
+struct RoutePickerView: UIViewRepresentable {
+    func makeUIView(context: Context) -> AVRoutePickerView {
+        let picker = AVRoutePickerView()
+        picker.tintColor = UIColor.secondaryLabel
+        picker.activeTintColor = UIColor.systemBlue
+        return picker
+    }
+
+    func updateUIView(_ uiView: AVRoutePickerView, context: Context) {}
+}
 
 struct ContentView: View {
     private let miniPlayerHeight: CGFloat = 60
@@ -186,9 +198,7 @@ private struct ExpandedMiniPlayerContent: View {
 
                 Spacer()
 
-                Image(systemName: "airplayaudio")
-                    .font(.title2)
-                    .foregroundStyle(.secondary)
+                RoutePickerView()
             }
             .padding(.horizontal, 40)
             .padding(.bottom, 40)

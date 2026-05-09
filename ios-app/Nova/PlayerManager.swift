@@ -1,6 +1,7 @@
 import SwiftUI
 import Combine
 import AVFoundation
+import MediaPlayer
 
 public struct Song: Identifiable, Equatable {
     public let id: UUID
@@ -63,7 +64,9 @@ final class PlayerManager: ObservableObject {
     private var avPlayer: AVPlayer? = nil
     private var timeObserver: Any? = nil
 
-    private init() {}
+    private init() {
+        setupRemoteCommands()
+    }
 
     func setQueue(_ songs: [Song], startAt index: Int = 0, playImmediately: Bool = false) {
         cleanupPlayer()
@@ -78,6 +81,7 @@ final class PlayerManager: ObservableObject {
             artwork = nil
         }
         if playImmediately { play() }
+        updateNowPlayingInfo()
     }
 
     func addToQueue(_ song: Song) {
@@ -94,11 +98,13 @@ final class PlayerManager: ObservableObject {
         if avPlayer == nil { loadAVPlayer() }
         avPlayer?.play()
         isPlaying = true
+        updateNowPlayingInfo()
     }
 
     func pause() {
         avPlayer?.pause()
         isPlaying = false
+        updateNowPlayingInfo()
     }
 
     func togglePlayPause() {
@@ -113,6 +119,7 @@ final class PlayerManager: ObservableObject {
             loadArtwork()
             if isPlaying { play() }
             updateLyrics()
+            updateNowPlayingInfo()
             return
         }
         stop()
@@ -128,6 +135,7 @@ final class PlayerManager: ObservableObject {
         cleanupPlayer()
         isPlaying = false
         progress = 0
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
     }
 
     func seek(to time: TimeInterval) {
@@ -155,6 +163,7 @@ final class PlayerManager: ObservableObject {
         let interval = CMTime(seconds: 0.5, preferredTimescale: 600)
         timeObserver = avPlayer?.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             self?.progress = time.seconds
+            self?.updateNowPlayingInfo()
         }
     }
 
@@ -162,6 +171,33 @@ final class PlayerManager: ObservableObject {
         if let obs = timeObserver { avPlayer?.removeTimeObserver(obs); timeObserver = nil }
         avPlayer?.pause()
         avPlayer = nil
+    }
+
+    private func setupRemoteCommands() {
+        let cmd = MPRemoteCommandCenter.shared()
+        cmd.playCommand.addTarget { [weak self] _ in self?.play(); return .success }
+        cmd.pauseCommand.addTarget { [weak self] _ in self?.pause(); return .success }
+        cmd.togglePlayPauseCommand.addTarget { [weak self] _ in self?.togglePlayPause(); return .success }
+        cmd.nextTrackCommand.addTarget { [weak self] _ in self?.next(); return .success }
+        cmd.previousTrackCommand.addTarget { [weak self] _ in self?.previous(); return .success }
+        cmd.changePlaybackPositionCommand.addTarget { [weak self] event in
+            if let e = event as? MPChangePlaybackPositionCommandEvent { self?.seek(to: e.positionTime) }
+            return .success
+        }
+    }
+
+    private func updateNowPlayingInfo() {
+        var info: [String: Any] = [
+            MPMediaItemPropertyTitle: currentSong?.title ?? "",
+            MPMediaItemPropertyArtist: currentSong?.artist ?? "",
+            MPMediaItemPropertyPlaybackDuration: currentSong?.duration ?? 0,
+            MPNowPlayingInfoPropertyElapsedPlaybackTime: progress,
+            MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? 1.0 : 0.0,
+        ]
+        if let img = artwork {
+            info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: img.size, requestHandler: { _ in img })
+        }
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
     }
 
     private func loadArtwork() {
