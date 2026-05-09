@@ -199,6 +199,7 @@ private struct ExpandedMiniPlayerContent: View {
                 Spacer()
 
                 RoutePickerView()
+                    .frame(width: 44, height: 28)
             }
             .padding(.horizontal, 40)
             .padding(.bottom, 40)
