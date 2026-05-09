@@ -76,11 +76,11 @@ struct RadioContent: View {
             List(0..<5) { i in
                 HStack(spacing: 12) {
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.purple.opacity(0.3))
+                        .fill(Color.gray.opacity(0.15))
                         .frame(width: 60, height: 60)
                         .overlay {
                             Image(systemName: "dot.radiowaves.left.and.right")
-                                .foregroundStyle(.purple)
+                                .foregroundStyle(.secondary)
                         }
                     VStack(alignment: .leading) {
                         Text("Station \(i + 1)")
@@ -201,14 +201,8 @@ struct SongCard: View {
     var body: some View {
         Button(action: { playSong() }) {
             VStack(alignment: .leading, spacing: 8) {
-                RoundedRectangle(cornerRadius: cardSize / 8)
-                    .fill(Color.purple.opacity(0.2))
-                    .frame(width: cardSize, height: cardSize)
-                    .overlay {
-                        Image(systemName: "music.note")
-                            .font(.largeTitle)
-                            .foregroundStyle(.purple)
-                    }
+                RemoteImageView(urlString: "https://cataas.com/cat?width=\(Int(cardSize))&height=\(Int(cardSize))", width: cardSize, height: cardSize)
+                    .clipShape(RoundedRectangle(cornerRadius: cardSize / 8))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(song.title)
                         .font(.caption)
@@ -240,13 +234,8 @@ struct SongRow: View {
     var body: some View {
         Button(action: { playSong() }) {
             HStack(spacing: 12) {
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.purple.opacity(0.2))
-                    .frame(width: 48, height: 48)
-                    .overlay {
-                        Image(systemName: "music.note")
-                            .foregroundStyle(.purple)
-                    }
+                RemoteImageView(urlString: "https://cataas.com/cat?width=96&height=96", width: 48, height: 48)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
                 VStack(alignment: .leading, spacing: 4) {
                     Text(song.title)
                         .font(.subheadline)

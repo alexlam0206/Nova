@@ -106,7 +106,6 @@ private struct ExpandedMiniPlayerContent: View {
             }
             .frame(width: 300, height: 300)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .shadow(color: .black.opacity(0.4), radius: 30, y: 20)
 
             Spacer()
 
