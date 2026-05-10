@@ -10,16 +10,19 @@ const STORAGE_PATH = process.env.STORAGE_PATH || '/data/storage'
 function downloadAudio(url: string, songId: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const outTemplate = path.join(STORAGE_PATH, `${songId}.%(ext)s`)
-    const cmd = `yt-dlp -x --audio-format mp3 -o "${outTemplate}" --no-playlist "${url}"`
-    exec(cmd, { timeout: 300000 }, (error, stdout, stderr) => {
+    const cmd = `yt-dlp --extractor-args "youtube:player_client=android" -f 18 -x --audio-format mp3 -o "${outTemplate}" --no-playlist "${url}"`
+    exec(cmd, { timeout: 300000 }, (error, _stdout, stderr) => {
       if (error) {
         console.error('yt-dlp error:', stderr)
         reject(error)
         return
       }
-      const outPath = path.join(STORAGE_PATH, `${songId}.mp3`)
-      if (fs.existsSync(outPath)) {
-        resolve(outPath)
+      const mp3Path = path.join(STORAGE_PATH, `${songId}.mp3`)
+      const mp4Path = path.join(STORAGE_PATH, `${songId}.mp4`)
+      if (fs.existsSync(mp3Path)) {
+        resolve(mp3Path)
+      } else if (fs.existsSync(mp4Path)) {
+        resolve(mp4Path)
       } else {
         const files = fs.readdirSync(STORAGE_PATH).filter(f => f.startsWith(songId))
         if (files.length > 0) {
@@ -41,11 +44,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const info = await video_info(url)
     const details = info.video_details
     const trackName = details.title || 'Unknown'
-    const artistName = details.author?.name || 'Unknown'
-    const coverUrl = details.thumbnails?.[0]?.url || null
+    const artistName = details.channel?.name || 'Unknown'
+    const thumbs = details.thumbnails || []
+    const coverUrl = thumbs.length > 0 ? thumbs[thumbs.length - 1].url : null
     const duration = parseInt(info.format[0]?.approxDurationMs || '0') / 1000 || null
 
-    const tempId = `temp_${Date.now()}`
+    const tempId = `yt_${Date.now()}`
     let filePath: string | null = null
 
     try {
@@ -59,11 +63,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     })
 
     if (filePath) {
-      const finalPath = path.join(STORAGE_PATH, `${song.id}.m4a`)
-      fs.renameSync(filePath, finalPath)
-      await prisma.song.update({ where: { id: song.id }, data: { filePath: finalPath, status: 'ready' } })
-      song.filePath = finalPath
-      song.status = 'ready'
+      const finalPath = path.join(STORAGE_PATH, `${song.id}.mp3`)
+      try {
+        fs.renameSync(filePath, finalPath)
+        await prisma.song.update({ where: { id: song.id }, data: { filePath: finalPath, status: 'ready' } })
+        song.filePath = finalPath
+        song.status = 'ready'
+      } catch (renameErr) {
+        console.warn('rename failed:', renameErr)
+      }
     }
 
     res.json({ ok: true, song })
