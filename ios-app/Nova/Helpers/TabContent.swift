@@ -183,6 +183,13 @@ struct SearchContent: View {
             .navigationTitle("Search")
             .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Song or YouTube URL")
             .onSubmit(of: .search) { handleSearch() }
+            .onChange(of: query) { _, newValue in
+                if newValue.isEmpty {
+                    searchResults = []
+                    isSearching = false
+                    isImporting = false
+                }
+            }
             .alert("Notice", isPresented: $showAlert) {
                 Button("OK", role: .cancel) {}
             } message: {
