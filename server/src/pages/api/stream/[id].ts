@@ -19,8 +19,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const stat = fs.statSync(filePath)
   const range = req.headers.range
+  const ext = path.extname(filePath).toLowerCase()
+  const contentType = ext === '.mp3' ? 'audio/mpeg' : ext === '.m4a' ? 'audio/mp4' : 'audio/mpeg'
   if (!range) {
-    res.setHeader('Content-Type', 'audio/mp4')
+    res.setHeader('Content-Type', contentType)
     res.setHeader('Content-Length', stat.size)
     fs.createReadStream(filePath).pipe(res)
     return
@@ -35,7 +37,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     'Content-Range': `bytes ${start}-${end}/${stat.size}`,
     'Accept-Ranges': 'bytes',
     'Content-Length': chunkSize,
-    'Content-Type': 'audio/mp4',
+    'Content-Type': contentType,
   })
   stream.pipe(res)
 }

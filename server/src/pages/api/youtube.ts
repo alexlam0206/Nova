@@ -2,39 +2,33 @@ import { NextApiRequest, NextApiResponse } from 'next'
 import { video_info } from 'play-dl'
 import path from 'path'
 import fs from 'fs'
-import http from 'http'
-import https from 'https'
+import { exec } from 'child_process'
 import { prisma } from '../../lib/prisma'
 
 const STORAGE_PATH = process.env.STORAGE_PATH || '/data/storage'
 
-function fetchStream(url: string): Promise<NodeJS.ReadableStream> {
+function downloadAudio(url: string, songId: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    const mod = url.startsWith('https') ? https : http
-    const req = mod.request(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (res) => {
-      if (res.statusCode === 301 || res.statusCode === 302) {
-        fetchStream(res.headers.location!).then(resolve).catch(reject)
+    const outTemplate = path.join(STORAGE_PATH, `${songId}.%(ext)s`)
+    const cmd = `yt-dlp -x --audio-format mp3 -o "${outTemplate}" --no-playlist "${url}"`
+    exec(cmd, { timeout: 300000 }, (error, stdout, stderr) => {
+      if (error) {
+        console.error('yt-dlp error:', stderr)
+        reject(error)
+        return
+      }
+      const outPath = path.join(STORAGE_PATH, `${songId}.mp3`)
+      if (fs.existsSync(outPath)) {
+        resolve(outPath)
       } else {
-        resolve(res)
+        const files = fs.readdirSync(STORAGE_PATH).filter(f => f.startsWith(songId))
+        if (files.length > 0) {
+          resolve(path.join(STORAGE_PATH, files[0]))
+        } else {
+          reject(new Error('Downloaded file not found'))
+        }
       }
     })
-    req.on('error', reject)
-    req.end()
-  })
-}
-
-async function downloadAudio(url: string, songId: string): Promise<string> {
-  const outPath = path.join(STORAGE_PATH, `${songId}.m4a`)
-  const info = await video_info(url)
-  const audioFmt = info.format.find((f: any) => f.type?.startsWith('audio'))
-  if (!audioFmt?.url) throw new Error('No audio URL')
-
-  const stream = await fetchStream(audioFmt.url) as NodeJS.ReadableStream
-  const writeStream = fs.createWriteStream(outPath)
-  stream.pipe(writeStream)
-  return new Promise((resolve, reject) => {
-    writeStream.on('finish', () => resolve(outPath))
-    writeStream.on('error', reject)
   })
 }
 
