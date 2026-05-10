@@ -1,12 +1,14 @@
 import Foundation
 
 private let kBaseURLKey = "nova_server_base_url"
+private let kAppGroup = "group.alexlam.Nova"
 private var cachedBaseURL: String?
 
 var baseURL: String {
     get {
         if let cached = cachedBaseURL { return cached }
-        if let saved = UserDefaults.standard.string(forKey: kBaseURLKey), !saved.isEmpty {
+        let defaults = UserDefaults(suiteName: kAppGroup) ?? UserDefaults.standard
+        if let saved = defaults.string(forKey: kBaseURLKey), !saved.isEmpty {
             cachedBaseURL = saved
             return saved
         }
@@ -16,7 +18,8 @@ var baseURL: String {
     }
     set {
         cachedBaseURL = newValue
-        UserDefaults.standard.set(newValue, forKey: kBaseURLKey)
+        let defaults = UserDefaults(suiteName: kAppGroup) ?? UserDefaults.standard
+        defaults.set(newValue, forKey: kBaseURLKey)
     }
 }
 
@@ -31,6 +34,8 @@ struct SongDTO: Codable, Identifiable {
     let status: String
     let source: String?
     let filePath: String?
+    /// YouTube URL for search results not yet imported
+    let youtubeUrl: String?
 }
 
 struct YouTubeImportResponse: Codable {

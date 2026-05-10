@@ -146,6 +146,7 @@ struct SearchContent: View {
     @State private var isImporting = false
     @State private var isSearching = false
     @State private var searchResults: [SongDTO] = []
+    @State private var importingId: String? = nil
     @State private var alertMessage = ""
     @State private var showAlert = false
 
@@ -163,8 +164,9 @@ struct SearchContent: View {
                 if !searchResults.isEmpty {
                     Section("Results") {
                         ForEach(searchResults) { dto in
-                            SearchResultRow(dto: dto)
-                                .onTapGesture { addToQueue(dto) }
+                            SearchResultRow(dto: dto, isImporting: importingId == dto.id)
+                                .contentShape(Rectangle())
+                                .onTapGesture { handleResultTap(dto) }
                         }
                     }
                 }
@@ -255,6 +257,37 @@ struct SearchContent: View {
         }
     }
 
+    private func handleResultTap(_ dto: SongDTO) {
+        let isYouTubeResult = dto.status == "youtube" || (dto.youtubeUrl != nil && dto.filePath == nil)
+        if isYouTubeResult {
+            let url = dto.youtubeUrl ?? dto.source ?? ""
+            guard !url.isEmpty else { return }
+            importingId = dto.id
+            Task {
+                do {
+                    let imported = try await importYouTubeFromURL(url: url)
+                    await MainActor.run {
+                        importingId = nil
+                        if imported.filePath != nil || imported.source != nil {
+                            addToQueue(imported)
+                        } else {
+                            alertMessage = "Import failed"
+                            showAlert = true
+                        }
+                    }
+                } catch {
+                    await MainActor.run {
+                        importingId = nil
+                        alertMessage = error.localizedDescription
+                        showAlert = true
+                    }
+                }
+            }
+        } else {
+            addToQueue(dto)
+        }
+    }
+
     private func addToQueue(_ dto: SongDTO) {
         let audioURL: URL?
         if let fp = dto.filePath, !fp.isEmpty {
@@ -281,9 +314,15 @@ struct SearchContent: View {
 
 struct SearchResultRow: View {
     let dto: SongDTO
+    var isImporting: Bool = false
     var body: some View {
         HStack(spacing: 12) {
-            if let coverUrl = dto.coverUrl {
+            if isImporting {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.red.opacity(0.15))
+                    .frame(width: 48, height: 48)
+                    .overlay { ProgressView() }
+            } else if let coverUrl = dto.coverUrl {
                 RemoteImageView(urlString: coverUrl, width: 48, height: 48)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
             } else {
@@ -304,7 +343,15 @@ struct SearchResultRow: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            if dto.source != nil {
+            if isImporting {
+                Text("Importing...")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            } else if dto.status == "youtube" || dto.youtubeUrl != nil {
+                Image(systemName: "plus.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(.red)
+            } else if dto.filePath != nil || dto.source != nil {
                 Image(systemName: "link")
                     .font(.caption)
                     .foregroundStyle(.secondary)

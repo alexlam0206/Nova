@@ -21,8 +21,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const range = req.headers.range
   const ext = path.extname(filePath).toLowerCase()
   const contentType = ext === '.mp3' ? 'audio/mpeg' : ext === '.m4a' ? 'audio/mp4' : 'audio/mpeg'
+  res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+  res.setHeader('Content-Type', contentType)
   if (!range) {
-    res.setHeader('Content-Type', contentType)
     res.setHeader('Content-Length', stat.size)
     fs.createReadStream(filePath).pipe(res)
     return

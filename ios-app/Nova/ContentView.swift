@@ -15,7 +15,6 @@ struct RoutePickerView: UIViewRepresentable {
 struct ContentView: View {
     private let miniPlayerHeight: CGFloat = 60
     @State private var expandMiniPlayer: Bool = false
-    @State private var dragOffset: CGFloat = 0
     @State private var showQueue: Bool = false
     @Namespace private var animation
     @StateObject private var player = PlayerManager.shared
@@ -32,7 +31,6 @@ struct ContentView: View {
                         .contentShape(Rectangle())
                         .onTapGesture {
                             withAnimation {
-                                dragOffset = 0
                                 expandMiniPlayer = true
                             }
                         }
@@ -40,33 +38,11 @@ struct ContentView: View {
                         .padding(.horizontal, 15)
                 }
                 .ignoresSafeArea(.keyboard, edges: .all)
-                .fullScreenCover(isPresented: $expandMiniPlayer) {
-                    GeometryReader { geo in
-                        ExpandedMiniPlayerContent(dragOffset: $dragOffset,
-                                                   expandMiniPlayer: $expandMiniPlayer,
-                                                   animation: animation)
-                            .environmentObject(player)
-                            .padding(.top, geo.safeAreaInsets.top + 8)
-                            .ignoresSafeArea()
-                            .gesture(
-                                DragGesture()
-                                    .onChanged { value in
-                                        dragOffset = max(0, value.translation.height)
-                                    }
-                                    .onEnded { value in
-                                        let shouldClose = value.translation.height > 120 || value.predictedEndTranslation.height > 150
-                                        if shouldClose {
-                                            withAnimation {
-                                                expandMiniPlayer = false
-                                            }
-                                        } else {
-                                            withAnimation {
-                                                dragOffset = 0
-                                            }
-                                        }
-                                    }
-                            )
-                    }
+                .sheet(isPresented: $expandMiniPlayer) {
+                    ExpandedMiniPlayerContent(expandMiniPlayer: $expandMiniPlayer)
+                        .environmentObject(player)
+                        .presentationDetents([.large])
+                        .presentationDragIndicator(.visible)
                 }
                 .sheet(isPresented: $showQueue) {
                     QueueView()
@@ -78,38 +54,12 @@ struct ContentView: View {
 }
 
 private struct ExpandedMiniPlayerContent: View {
-    @Binding var dragOffset: CGFloat
     @Binding var expandMiniPlayer: Bool
-    var animation: Namespace.ID
     @EnvironmentObject private var player: PlayerManager
-    @State private var showMore: Bool = false
 
     var body: some View {
         VStack(spacing: 0) {
-            // Drag indicator
-            Capsule()
-                .fill(.primary.opacity(0.5))
-                .frame(width: 35, height: 3)
-                .padding(.top, 8)
-
-            // Top row: close button
-            HStack {
-                Button(action: { expandMiniPlayer = false }) {
-                    Image(systemName: "chevron.down")
-                        .font(.title2.bold())
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button(action: { showMore = true }) {
-                    Image(systemName: "ellipsis")
-                        .font(.title2.bold())
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-
-            Spacer()
+            Spacer().frame(height: 8)
 
             // Album art
             Group {
@@ -122,15 +72,13 @@ private struct ExpandedMiniPlayerContent: View {
                         .fill(.ultraThinMaterial)
                 }
             }
-            .frame(width: 300, height: 300)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-
-            Spacer()
+            .frame(width: 240, height: 240)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
             // Song info
-            VStack(spacing: 6) {
+            VStack(spacing: 4) {
                 Text(player.currentSong?.title ?? "Not Playing")
-                    .font(.title2.bold())
+                    .font(.title3.bold())
                     .foregroundStyle(.primary)
                     .lineLimit(1)
 
@@ -143,13 +91,12 @@ private struct ExpandedMiniPlayerContent: View {
                     Text(lyric)
                         .font(.caption)
                         .foregroundStyle(.tertiary)
-                        .padding(.top, 4)
+                        .padding(.top, 2)
                         .lineLimit(1)
                 }
             }
             .padding(.horizontal, 40)
-
-            Spacer()
+            .padding(.top, 16)
 
             // Progress bar
             VStack(spacing: 6) {
@@ -169,39 +116,47 @@ private struct ExpandedMiniPlayerContent: View {
                 }
             }
             .padding(.horizontal, 24)
-
-            Spacer()
+            .padding(.top, 16)
 
             // Playback controls
             HStack(spacing: 40) {
                 Button(action: { player.previous() }) {
                     Image(systemName: "backward.fill")
-                        .font(.title)
+                        .font(.title2)
                         .foregroundStyle(.primary)
                 }
 
                 Button(action: { player.togglePlayPause() }) {
                     Image(systemName: player.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                        .font(.system(size: 64))
+                        .font(.system(size: 56))
                         .foregroundStyle(.primary)
                 }
 
                 Button(action: { player.next() }) {
                     Image(systemName: "forward.fill")
-                        .font(.title)
+                        .font(.title2)
                         .foregroundStyle(.primary)
                 }
             }
+            .padding(.top, 16)
 
-            Spacer()
-
-            // Bottom row: favorite + extras
+            // Bottom row: favorite + share + route picker
             HStack(spacing: 30) {
                 Button(action: { player.toggleFavorite() }) {
                     Image(systemName: player.isFavorited ? "star.fill" : "star")
-                        .font(.title2)
-                        .foregroundStyle(player.isFavorited ? .yellow : .secondary)
+                        .font(.title3)
+                        .foregroundStyle(player.isFavorited ? .yellow : .primary)
                 }
+                .opacity(player.currentSong != nil ? 1 : 0.3)
+                .disabled(player.currentSong == nil)
+
+                ShareLink(item: player.currentSong?.source ?? "") {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.title2)
+                        .foregroundStyle(.primary)
+                }
+                .opacity(player.currentSong?.source != nil ? 1 : 0.3)
+                .disabled(player.currentSong?.source == nil)
 
                 Spacer()
 
@@ -209,17 +164,11 @@ private struct ExpandedMiniPlayerContent: View {
                     .frame(width: 44, height: 28)
             }
             .padding(.horizontal, 40)
-            .padding(.bottom, 40)
+            .padding(.top, 16)
         }
         .padding(.horizontal, 16)
-        .offset(y: dragOffset)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.background)
-        .confirmationDialog("More Options", isPresented: $showMore) {
-            Button("Add to Playlist") {}
-            Button("Share") {}
-            Button("Cancel", role: .cancel) {}
-        }
     }
 }
 
@@ -250,7 +199,7 @@ private struct ProgressBar: View {
     }
 }
 
-// MARK: - Queue View
+// MARK: Queue View
 struct QueueView: View {
     @EnvironmentObject private var player: PlayerManager
     @Environment(\.dismiss) private var dismiss

@@ -6,6 +6,7 @@ import MediaPlayer
 public struct Song: Identifiable, Equatable {
     public let id: UUID
     public var serverId: String?
+    public var source: String?
     public var title: String
     public var artist: String
     public var duration: TimeInterval
@@ -13,10 +14,11 @@ public struct Song: Identifiable, Equatable {
     public var audioURL: URL?
     public var lyrics: [LyricLine]
 
-    public init(id: UUID = .init(), serverId: String? = nil, title: String, artist: String, duration: TimeInterval,
+    public init(id: UUID = .init(), serverId: String? = nil, source: String? = nil, title: String, artist: String, duration: TimeInterval,
                 artworkURL: URL? = nil, audioURL: URL? = nil, lyrics: [LyricLine] = []) {
         self.id = id
         self.serverId = serverId
+        self.source = source
         self.title = title
         self.artist = artist
         self.duration = duration
@@ -153,7 +155,7 @@ final class PlayerManager: ObservableObject {
         }
 
         avPlayer = AVPlayer(url: url)
-        let interval = CMTime(seconds: 0.5, preferredTimescale: 600)
+        let interval = CMTime(seconds: 2.0, preferredTimescale: 600)
         timeObserver = avPlayer?.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             self?.progress = time.seconds
             self?.updateNowPlayingInfo()
