@@ -36,6 +36,7 @@ struct SongDTO: Codable, Identifiable {
 struct YouTubeImportResponse: Codable {
     let ok: Bool
     let song: SongDTO
+    let duplicate: Bool?
 }
 
 enum APIError: Error, LocalizedError {
@@ -80,4 +81,16 @@ func searchSongs(query: String) async throws -> [SongDTO] {
         throw APIError.networkError("Server error")
     }
     return try JSONDecoder().decode([SongDTO].self, from: data)
+}
+
+func deleteSong(id: String) async throws {
+    guard let apiURL = URL(string: "\(baseURL)/api/songs/\(id)") else {
+        throw APIError.invalidURL
+    }
+    var req = URLRequest(url: apiURL)
+    req.httpMethod = "DELETE"
+    let (_, resp) = try await URLSession.shared.data(for: req)
+    guard let httpResp = resp as? HTTPURLResponse, httpResp.statusCode == 200 else {
+        throw APIError.networkError("Server error")
+    }
 }

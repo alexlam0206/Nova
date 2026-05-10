@@ -153,9 +153,10 @@ private struct ExpandedMiniPlayerContent: View {
 
             // Progress bar
             VStack(spacing: 6) {
-                ProgressBar(progress: player.progress, duration: player.currentSong?.duration ?? 1)
+                ProgressBar(progress: player.progress, duration: player.currentSong?.duration ?? 1) { newProgress in
+                        player.seek(to: newProgress)
+                    }
                     .frame(height: 4)
-                    .onTapGesture { } // placeholders — drag handled by gesture below
 
                 HStack {
                     Text(formatTime(player.progress))
@@ -222,10 +223,11 @@ private struct ExpandedMiniPlayerContent: View {
     }
 }
 
-// MARK: - Progress Bar
+// MARK: - Draggable Progress Bar
 private struct ProgressBar: View {
     let progress: TimeInterval
     let duration: TimeInterval
+    var onSeek: ((TimeInterval) -> Void)?
 
     var body: some View {
         GeometryReader { geo in
@@ -234,6 +236,15 @@ private struct ProgressBar: View {
                 Capsule().fill(.primary)
                     .frame(width: max(0, geo.size.width * (progress / max(duration, 1))))
             }
+            .frame(height: 4)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        let ratio = min(max(value.location.x / geo.size.width, 0), 1)
+                        onSeek?(ratio * duration)
+                    }
+            )
         }
         .frame(height: 4)
     }

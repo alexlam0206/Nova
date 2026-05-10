@@ -41,6 +41,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!url) return res.status(400).json({ error: 'url is required' })
 
   try {
+    const existing = await prisma.song.findFirst({ where: { source: url } })
+    if (existing) {
+      res.json({ ok: true, song: existing, duplicate: true })
+      return
+    }
+
     const info = await video_info(url)
     const details = info.video_details
     const trackName = details.title || 'Unknown'

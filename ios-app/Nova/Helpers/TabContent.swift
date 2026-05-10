@@ -119,6 +119,8 @@ struct LibraryContent: View {
     @EnvironmentObject private var player: PlayerManager
     @State private var librarySongs: [Song] = []
     @State private var isLoading: Bool = false
+    @State private var songToDelete: Song?
+    @State private var showDeleteConfirm: Bool = false
 
     var body: some View {
         NavigationStack {
@@ -137,6 +139,7 @@ struct LibraryContent: View {
                         ForEach(librarySongs) { song in
                             SongRow(song: song)
                         }
+                        .onDelete(perform: deleteSongs)
                     }
                     .listStyle(.plain)
                 }
@@ -152,8 +155,29 @@ struct LibraryContent: View {
                     }
                 }
             }
+            .alert("Delete Song", isPresented: $showDeleteConfirm) {
+                Button("Cancel", role: .cancel) { songToDelete = nil }
+                Button("Delete", role: .destructive) { confirmDelete() }
+            } message: {
+                Text("Remove \"\(songToDelete?.title ?? "")\" from library and server?")
+            }
             .task { await fetchLibrarySongs() }
         }
+    }
+
+    private func deleteSongs(at offsets: IndexSet) {
+        guard let idx = offsets.first else { return }
+        songToDelete = librarySongs[idx]
+        showDeleteConfirm = true
+    }
+
+    private func confirmDelete() {
+        guard let song = songToDelete, let sid = song.serverId else { songToDelete = nil; return }
+        librarySongs.removeAll { $0.id == song.id }
+        Task {
+            try? await deleteSong(id: sid)
+        }
+        songToDelete = nil
     }
 
     private func fetchLibrarySongs() async {
@@ -170,6 +194,7 @@ struct LibraryContent: View {
                 }
                 return Song(
                     id: UUID(uuidString: dto.id) ?? UUID(),
+                    serverId: dto.id,
                     title: dto.trackName,
                     artist: dto.artistName,
                     duration: TimeInterval(dto.duration ?? 0),
@@ -289,8 +314,12 @@ struct SearchContent: View {
                 let song = try await importYouTubeFromURL(url: url)
                 await MainActor.run {
                     isImporting = false
-                    addToQueue(song)
-                    alertMessage = "Added: \(song.trackName)"
+                    if song.status == "ready" && song.filePath != nil {
+                        addToQueue(song)
+                        alertMessage = "Added: \(song.trackName)"
+                    } else {
+                        alertMessage = "\(song.trackName) already in library"
+                    }
                     showAlert = true
                     query = ""
                     searchResults = []
