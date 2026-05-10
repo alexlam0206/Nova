@@ -22,24 +22,6 @@ public struct Song: Identifiable, Equatable {
         self.audioURL = audioURL
         self.lyrics = lyrics
     }
-
-    static let samples: [Song] = [
-        Song(title: "Blinding Lights", artist: "The Weeknd", duration: 200,
-             artworkURL: URL(string: "https://cataas.com/cat?width=600&height=600"),
-             audioURL: URL(string: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3")),
-        Song(title: "Levitating", artist: "Dua Lipa", duration: 203,
-             artworkURL: URL(string: "https://cataas.com/cat?width=600&height=600"),
-             audioURL: URL(string: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3")),
-        Song(title: "Stay", artist: "Kid LAROI", duration: 141,
-             artworkURL: URL(string: "https://cataas.com/cat?width=600&height=600"),
-             audioURL: URL(string: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3")),
-        Song(title: "good 4 u", artist: "Olivia Rodrigo", duration: 178,
-             artworkURL: URL(string: "https://cataas.com/cat?width=600&height=600"),
-             audioURL: URL(string: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3")),
-        Song(title: "Heat Waves", artist: "Glass Animals", duration: 239,
-             artworkURL: URL(string: "https://cataas.com/cat?width=600&height=600"),
-             audioURL: URL(string: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3")),
-    ]
 }
 
 public struct LyricLine: Equatable {
@@ -63,6 +45,7 @@ final class PlayerManager: ObservableObject {
 
     private var avPlayer: AVPlayer? = nil
     private var timeObserver: Any? = nil
+    private var artworkTask: Task<Void, Never>?
 
     private init() {
         setupRemoteCommands()
@@ -211,34 +194,13 @@ final class PlayerManager: ObservableObject {
     private func loadArtwork() {
         artworkTask?.cancel()
         artwork = nil
-        guard let url = currentSong?.artworkURL else { ensurePlaceholderLoaded(); return }
+        guard let url = currentSong?.artworkURL else { return }
 
         artworkTask = Task { [weak self] in
             do {
                 let (data, _) = try await URLSession.shared.data(from: url)
                 if let img = UIImage(data: data) {
                     await MainActor.run { self?.artwork = img }
-                }
-            } catch {
-                await MainActor.run { self?.ensurePlaceholderLoaded() }
-            }
-        }
-    }
-
-    func ensurePlaceholderLoaded() {
-        guard placeholderArtwork == nil else {
-            if artwork == nil { artwork = placeholderArtwork }
-            return
-        }
-        artworkTask = Task { [weak self] in
-            do {
-                let url = URL(string: "https://cataas.com/cat?width=600&height=600")!
-                let (data, _) = try await URLSession.shared.data(from: url)
-                if let img = UIImage(data: data) {
-                    await MainActor.run {
-                        self?.placeholderArtwork = img
-                        if self?.artwork == nil { self?.artwork = img }
-                    }
                 }
             } catch { }
         }
@@ -252,6 +214,4 @@ final class PlayerManager: ObservableObject {
         let idx = (lines.indices).last { lines[$0].time <= progress }
         currentLyric = idx.map { lines[$0].text }
     }
-
-    private var artworkTask: Task<Void, Never>?
 }

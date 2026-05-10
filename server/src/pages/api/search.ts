@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next'
-import { prisma } from '../../../lib/prisma'
+import { prisma } from '../../lib/prisma'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return res.status(405).end()
@@ -12,6 +12,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         { trackName: { contains: q, mode: 'insensitive' } },
         { artistName: { contains: q, mode: 'insensitive' } },
       ]
+    },
+    select: {
+      id: true, trackName: true, artistName: true, album: true,
+      year: true, coverUrl: true, duration: true, status: true,
+      source: true, filePath: true,
     },
     take: 20,
     orderBy: { createdAt: 'desc' },

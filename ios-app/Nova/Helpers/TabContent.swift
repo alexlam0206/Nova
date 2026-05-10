@@ -3,74 +3,80 @@ import SwiftUI
 struct TabContent: View {
     var safeAreaBottomPadding: CGFloat
     var tab: Tabs = .home
+    var showSettings: Binding<Bool>?
 
     var body: some View {
         switch tab {
-        case .home:    HomeContent(padding: safeAreaBottomPadding)
-        case .new:     NewContent(padding: safeAreaBottomPadding)
-        case .radio:   RadioContent(padding: safeAreaBottomPadding)
-        case .library: LibraryContent(padding: safeAreaBottomPadding)
-        case .search:  SearchContent(padding: safeAreaBottomPadding)
+        case .home:    HomeContent(padding: safeAreaBottomPadding, showSettings: showSettings)
+        case .new:     NewContent(padding: safeAreaBottomPadding, showSettings: showSettings)
+        case .radio:   RadioContent(padding: safeAreaBottomPadding, showSettings: showSettings)
+        case .library: LibraryContent(padding: safeAreaBottomPadding, showSettings: showSettings)
+        case .search:  SearchContent(padding: safeAreaBottomPadding, showSettings: showSettings)
         }
     }
 }
 
 struct HomeContent: View {
     var padding: CGFloat
+    var showSettings: Binding<Bool>?
     var body: some View {
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 24) {
-                    Text("Recently Played")
+                    Text("Welcome to Nova")
                         .font(.title2.bold())
                         .padding(.horizontal)
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        LazyHStack(spacing: 16) {
-                            ForEach(Song.samples.prefix(3)) { song in
-                                SongCard(song: song, cardSize: 140)
-                            }
-                        }
+                    Text("Import songs via the Search tab to get started")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                         .padding(.horizontal)
-                    }
-                    Text("Made For You")
-                        .font(.title2.bold())
-                        .padding(.horizontal)
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        LazyHStack(spacing: 16) {
-                            ForEach(Song.samples) { song in
-                                SongCard(song: song, cardSize: 160)
-                            }
-                        }
-                        .padding(.horizontal)
-                    }
                 }
                 .padding(.top)
             }
             .background(Color.clear)
             .navigationTitle("Home")
             .safeAreaPadding(.bottom, padding)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showSettings?.wrappedValue = true } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.title3.bold())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
         }
     }
 }
 
 struct NewContent: View {
     var padding: CGFloat
+    var showSettings: Binding<Bool>?
     var body: some View {
         NavigationStack {
-            List {
-                ForEach(Song.samples) { song in
-                    SongRow(song: song)
-                }
-            }
-            .listStyle(.plain)
+            ContentUnavailableView(
+                "No New Releases",
+                systemImage: "sparkles",
+                description: Text("Check back after importing songs")
+            )
             .navigationTitle("What's New")
             .safeAreaPadding(.bottom, padding)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showSettings?.wrappedValue = true } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.title3.bold())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
         }
     }
 }
 
 struct RadioContent: View {
     var padding: CGFloat
+    var showSettings: Binding<Bool>?
     var body: some View {
         NavigationStack {
             List(0..<5) { i in
@@ -94,30 +100,93 @@ struct RadioContent: View {
             .listStyle(.plain)
             .navigationTitle("Radio")
             .safeAreaPadding(.bottom, padding)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showSettings?.wrappedValue = true } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.title3.bold())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
         }
     }
 }
 
 struct LibraryContent: View {
     var padding: CGFloat
+    var showSettings: Binding<Bool>?
     @EnvironmentObject private var player: PlayerManager
+    @State private var librarySongs: [Song] = []
+    @State private var isLoading: Bool = false
 
     var body: some View {
         NavigationStack {
-            List {
-                ForEach(Song.samples) { song in
-                    SongRow(song: song)
+            Group {
+                if isLoading {
+                    ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if librarySongs.isEmpty {
+                    ContentUnavailableView(
+                        "No Songs",
+                        systemImage: "music.note",
+                        description: Text("Import songs via Search tab")
+                    )
+                } else {
+                    List {
+                        ForEach(librarySongs) { song in
+                            SongRow(song: song)
+                        }
+                    }
+                    .listStyle(.plain)
                 }
             }
-            .listStyle(.plain)
             .navigationTitle("Library")
             .safeAreaPadding(.bottom, padding)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showSettings?.wrappedValue = true } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.title3.bold())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .task { await fetchLibrarySongs() }
+        }
+    }
+
+    private func fetchLibrarySongs() async {
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            let dtos = try await searchSongs(query: "")
+            librarySongs = dtos.map { dto in
+                let audioURL: URL?
+                if let fp = dto.filePath, !fp.isEmpty {
+                    audioURL = URL(string: "\(baseURL)/api/stream/\(dto.id)")
+                } else {
+                    audioURL = dto.source.flatMap { URL(string: $0) }
+                }
+                return Song(
+                    id: UUID(uuidString: dto.id) ?? UUID(),
+                    title: dto.trackName,
+                    artist: dto.artistName,
+                    duration: TimeInterval(dto.duration ?? 0),
+                    artworkURL: dto.coverUrl.flatMap { URL(string: $0) },
+                    audioURL: audioURL,
+                    lyrics: []
+                )
+            }
+        } catch {
+            print("failed to fetch library: \(error)")
         }
     }
 }
 
 struct SearchContent: View {
     var padding: CGFloat
+    var showSettings: Binding<Bool>?
     @State private var query = ""
     @State private var isImporting = false
     @State private var isSearching = false
@@ -163,6 +232,15 @@ struct SearchContent: View {
                 Text(alertMessage)
             }
             .safeAreaPadding(.bottom, padding)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showSettings?.wrappedValue = true } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.title3.bold())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
         }
     }
 
@@ -208,12 +286,14 @@ struct SearchContent: View {
         isImporting = true
         Task {
             do {
-                try await importYouTubeFromURL(url: url)
+                let song = try await importYouTubeFromURL(url: url)
                 await MainActor.run {
                     isImporting = false
-                    alertMessage = "Song imported!"
+                    addToQueue(song)
+                    alertMessage = "Added: \(song.trackName)"
                     showAlert = true
                     query = ""
+                    searchResults = []
                 }
             } catch {
                 await MainActor.run {
@@ -226,12 +306,18 @@ struct SearchContent: View {
     }
 
     private func addToQueue(_ dto: SongDTO) {
+        let audioURL: URL?
+        if let fp = dto.filePath, !fp.isEmpty {
+            audioURL = URL(string: "\(baseURL)/api/stream/\(dto.id)")
+        } else {
+            audioURL = dto.source.flatMap { URL(string: $0) }
+        }
         let song = Song(
             title: dto.trackName,
             artist: dto.artistName,
             duration: TimeInterval(dto.duration ?? 0),
             artworkURL: dto.coverUrl.flatMap { URL(string: $0) },
-            audioURL: dto.source.flatMap { URL(string: $0) }
+            audioURL: audioURL
         )
         PlayerManager.shared.addToQueue(song)
         alertMessage = "Added: \(dto.trackName)"
@@ -283,7 +369,7 @@ struct SongCard: View {
     var body: some View {
         Button(action: { playSong() }) {
             VStack(alignment: .leading, spacing: 8) {
-                RemoteImageView(urlString: "https://cataas.com/cat?width=\(Int(cardSize))&height=\(Int(cardSize))", width: cardSize, height: cardSize)
+                RemoteImageView(urlString: song.artworkURL?.absoluteString, width: cardSize, height: cardSize)
                     .clipShape(RoundedRectangle(cornerRadius: cardSize / 8))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(song.title)
@@ -303,9 +389,7 @@ struct SongCard: View {
     }
 
     private func playSong() {
-        if let idx = Song.samples.firstIndex(where: { $0.id == song.id }) {
-            player.setQueue(Song.samples, startAt: idx, playImmediately: true)
-        }
+        player.setQueue([song], playImmediately: true)
     }
 }
 
@@ -316,7 +400,7 @@ struct SongRow: View {
     var body: some View {
         Button(action: { playSong() }) {
             HStack(spacing: 12) {
-                RemoteImageView(urlString: "https://cataas.com/cat?width=96&height=96", width: 48, height: 48)
+                RemoteImageView(urlString: song.artworkURL?.absoluteString, width: 48, height: 48)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                 VStack(alignment: .leading, spacing: 4) {
                     Text(song.title)
@@ -337,8 +421,6 @@ struct SongRow: View {
     }
 
     private func playSong() {
-        if let idx = Song.samples.firstIndex(where: { $0.id == song.id }) {
-            player.setQueue(Song.samples, startAt: idx, playImmediately: true)
-        }
+        player.setQueue([song], playImmediately: true)
     }
 }

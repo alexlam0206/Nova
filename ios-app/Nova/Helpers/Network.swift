@@ -1,5 +1,25 @@
 import Foundation
 
+private let kBaseURLKey = "nova_server_base_url"
+private var cachedBaseURL: String?
+
+var baseURL: String {
+    get {
+        if let cached = cachedBaseURL { return cached }
+        if let saved = UserDefaults.standard.string(forKey: kBaseURLKey), !saved.isEmpty {
+            cachedBaseURL = saved
+            return saved
+        }
+        let defaultURL = "http://localhost:3000"
+        cachedBaseURL = defaultURL
+        return defaultURL
+    }
+    set {
+        cachedBaseURL = newValue
+        UserDefaults.standard.set(newValue, forKey: kBaseURLKey)
+    }
+}
+
 struct SongDTO: Codable, Identifiable {
     let id: String
     let trackName: String
@@ -10,6 +30,7 @@ struct SongDTO: Codable, Identifiable {
     let duration: Int?
     let status: String
     let source: String?
+    let filePath: String?
 }
 
 struct YouTubeImportResponse: Codable {
@@ -31,8 +52,7 @@ enum APIError: Error, LocalizedError {
     }
 }
 
-func importYouTubeFromURL(url: String) async throws {
-    let baseURL = "http://localhost:3000"
+func importYouTubeFromURL(url: String) async throws -> SongDTO {
     guard let apiURL = URL(string: "\(baseURL)/api/youtube") else {
         throw APIError.invalidURL
     }
@@ -42,14 +62,15 @@ func importYouTubeFromURL(url: String) async throws {
     req.setValue("application/json", forHTTPHeaderField: "Content-Type")
     req.httpBody = try JSONEncoder().encode(["url": url])
 
-    let (_, resp) = try await URLSession.shared.data(for: req)
+    let (data, resp) = try await URLSession.shared.data(for: req)
     guard let httpResp = resp as? HTTPURLResponse, httpResp.statusCode == 200 else {
         throw APIError.networkError("Server error")
     }
+    let result = try JSONDecoder().decode(YouTubeImportResponse.self, from: data)
+    return result.song
 }
 
 func searchSongs(query: String) async throws -> [SongDTO] {
-    let baseURL = "http://localhost:3000"
     guard let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
           let url = URL(string: "\(baseURL)/api/search?q=\(encoded)") else {
         throw APIError.invalidURL

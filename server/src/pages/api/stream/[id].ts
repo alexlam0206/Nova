@@ -6,7 +6,13 @@ import { prisma } from '../../../lib/prisma'
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query
   const song = await prisma.song.findUnique({ where: { id: String(id) } })
-  if (!song || !song.filePath) return res.status(404).end()
+  if (!song) return res.status(404).end()
+
+  if (!song.filePath) {
+    if (!song.source) return res.status(404).end()
+    res.redirect(307, song.source)
+    return
+  }
 
   const filePath = path.resolve(song.filePath)
   if (!fs.existsSync(filePath)) return res.status(404).end()

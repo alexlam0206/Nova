@@ -3,8 +3,7 @@ import SwiftUI
 @main
 struct NovaApp: App {
     init() {
-        // 示範用：自動載入 sample songs
-        PlayerManager.shared.setQueue(Song.samples, startAt: 0, playImmediately: false)
+        // noop - songs loaded from server when imported
     }
 
     var body: some Scene {

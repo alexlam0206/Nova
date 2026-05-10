@@ -2,7 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next'
 import formidable from 'formidable'
 import fs from 'fs'
 import { parse } from 'csv-parse/sync'
-import { prisma } from '../../../lib/prisma'
+import { prisma } from '../../lib/prisma'
 
 export const config = {
   api: { bodyParser: false },
