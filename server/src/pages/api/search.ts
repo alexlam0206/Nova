@@ -39,7 +39,7 @@ interface YtResult {
 
 function searchYouTube(q: string): Promise<YtResult[]> {
   return new Promise((resolve, reject) => {
-    const cmd = `yt-dlp --no-update --dump-json --flat-playlist --playlist-items 1-10 "ytsearch10:${q.replace(/"/g, '\\"')}"`
+    const cmd = `yt-dlp --no-update --dump-json --flat-playlist --playlist-items 1-50 "ytsearch50:${q.replace(/"/g, '\\"')}"`
     exec(cmd, { timeout: 30000 }, (error, stdout, stderr) => {
       if (error || !stdout) {
         console.error('yt-dlp search error:', stderr || error)
