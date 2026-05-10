@@ -3,22 +3,19 @@ import SwiftUI
 struct TabContent: View {
     var safeAreaBottomPadding: CGFloat
     var tab: Tabs = .home
-    var showSettings: Binding<Bool>?
 
     var body: some View {
         switch tab {
-        case .home:    HomeContent(padding: safeAreaBottomPadding, showSettings: showSettings)
-        case .new:     NewContent(padding: safeAreaBottomPadding, showSettings: showSettings)
-        case .radio:   RadioContent(padding: safeAreaBottomPadding, showSettings: showSettings)
-        case .library: LibraryContent(padding: safeAreaBottomPadding, showSettings: showSettings)
-        case .search:  SearchContent(padding: safeAreaBottomPadding, showSettings: showSettings)
+        case .home:    HomeContent(padding: safeAreaBottomPadding)
+        case .new:     NewContent(padding: safeAreaBottomPadding)
+        case .library: LibraryContent(padding: safeAreaBottomPadding)
+        case .search:  SearchContent(padding: safeAreaBottomPadding)
         }
     }
 }
 
 struct HomeContent: View {
     var padding: CGFloat
-    var showSettings: Binding<Bool>?
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -36,22 +33,12 @@ struct HomeContent: View {
             .background(Color.clear)
             .navigationTitle("Home")
             .safeAreaPadding(.bottom, padding)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { showSettings?.wrappedValue = true } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.title3.bold())
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
         }
     }
 }
 
 struct NewContent: View {
     var padding: CGFloat
-    var showSettings: Binding<Bool>?
     var body: some View {
         NavigationStack {
             ContentUnavailableView(
@@ -61,61 +48,12 @@ struct NewContent: View {
             )
             .navigationTitle("What's New")
             .safeAreaPadding(.bottom, padding)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { showSettings?.wrappedValue = true } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.title3.bold())
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-        }
-    }
-}
-
-struct RadioContent: View {
-    var padding: CGFloat
-    var showSettings: Binding<Bool>?
-    var body: some View {
-        NavigationStack {
-            List(0..<5) { i in
-                HStack(spacing: 12) {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.gray.opacity(0.15))
-                        .frame(width: 60, height: 60)
-                        .overlay {
-                            Image(systemName: "dot.radiowaves.left.and.right")
-                                .foregroundStyle(.secondary)
-                        }
-                    VStack(alignment: .leading) {
-                        Text("Station \(i + 1)")
-                            .font(.headline)
-                        Text("Live")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-            .listStyle(.plain)
-            .navigationTitle("Radio")
-            .safeAreaPadding(.bottom, padding)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { showSettings?.wrappedValue = true } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.title3.bold())
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
         }
     }
 }
 
 struct LibraryContent: View {
     var padding: CGFloat
-    var showSettings: Binding<Bool>?
     @EnvironmentObject private var player: PlayerManager
     @State private var librarySongs: [Song] = []
     @State private var isLoading: Bool = false
@@ -146,15 +84,6 @@ struct LibraryContent: View {
             }
             .navigationTitle("Library")
             .safeAreaPadding(.bottom, padding)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { showSettings?.wrappedValue = true } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.title3.bold())
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
             .alert("Delete Song", isPresented: $showDeleteConfirm) {
                 Button("Cancel", role: .cancel) { songToDelete = nil }
                 Button("Delete", role: .destructive) { confirmDelete() }
@@ -196,6 +125,7 @@ struct LibraryContent: View {
                 return Song(
                     id: UUID(uuidString: dto.id) ?? UUID(),
                     serverId: dto.id,
+                    source: dto.source,
                     title: dto.trackName,
                     artist: dto.artistName,
                     duration: TimeInterval(dto.duration ?? 0),
@@ -212,7 +142,6 @@ struct LibraryContent: View {
 
 struct SearchContent: View {
     var padding: CGFloat
-    var showSettings: Binding<Bool>?
     @State private var query = ""
     @State private var isImporting = false
     @State private var isSearching = false
@@ -258,15 +187,6 @@ struct SearchContent: View {
                 Text(alertMessage)
             }
             .safeAreaPadding(.bottom, padding)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { showSettings?.wrappedValue = true } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.title3.bold())
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
         }
     }
 
@@ -343,6 +263,8 @@ struct SearchContent: View {
             audioURL = dto.source.flatMap { URL(string: $0) }
         }
         let song = Song(
+            serverId: dto.id,
+            source: dto.source,
             title: dto.trackName,
             artist: dto.artistName,
             duration: TimeInterval(dto.duration ?? 0),
