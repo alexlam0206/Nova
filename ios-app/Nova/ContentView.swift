@@ -16,6 +16,7 @@ struct ContentView: View {
     private let miniPlayerHeight: CGFloat = 60
     @State private var expandMiniPlayer: Bool = false
     @State private var dragOffset: CGFloat = 0
+    @State private var showQueue: Bool = false
     @Namespace private var animation
     @StateObject private var player = PlayerManager.shared
 
@@ -26,8 +27,9 @@ struct ContentView: View {
             TabbarView(safeAreaBottomPadding: miniPlayerHeight)
                 .environmentObject(player)
                 .overlay(alignment: .bottom) {
-                    MiniPlayerView()
+                    MiniPlayerView(showQueue: $showQueue)
                         .matchedTransitionSafe(id: "MINIPLAYER", in: animation)
+                        .contentShape(Rectangle())
                         .onTapGesture {
                             withAnimation {
                                 dragOffset = 0
@@ -65,6 +67,10 @@ struct ContentView: View {
                                     }
                             )
                     }
+                }
+                .sheet(isPresented: $showQueue) {
+                    QueueView()
+                        .environmentObject(player)
                 }
         }
         .environmentObject(player)
@@ -230,6 +236,69 @@ private struct ProgressBar: View {
             }
         }
         .frame(height: 4)
+    }
+}
+
+// MARK: - Queue View
+struct QueueView: View {
+    @EnvironmentObject private var player: PlayerManager
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if player.queue.isEmpty {
+                    Text("Queue is empty")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(player.queue) { song in
+                        HStack(spacing: 12) {
+                            RemoteImageView(
+                                urlString: song.artworkURL?.absoluteString,
+                                width: 48, height: 48
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(song.title)
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                Text(song.artist)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Text(formatTime(TimeInterval(song.duration)))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            if let idx = player.queue.firstIndex(where: { $0.id == song.id }) {
+                                player.playSong(at: idx)
+                            }
+                        }
+                    }
+                    .onDelete { indexSet in
+                        for i in indexSet {
+                            player.queue.remove(at: i)
+                        }
+                    }
+                    .onMove { from, to in
+                        player.queue.move(fromOffsets: from, toOffset: to)
+                    }
+                }
+            }
+            .listStyle(.plain)
+            .navigationTitle("Queue")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "xmark")
+                    }
+                }
+            }
+        }
     }
 }
 

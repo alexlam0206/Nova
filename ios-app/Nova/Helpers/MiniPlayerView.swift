@@ -3,6 +3,7 @@ import SwiftUI
 struct MiniPlayerView: View {
     private let height: CGFloat = 60
     @EnvironmentObject private var player: PlayerManager
+    @Binding var showQueue: Bool
 
     var body: some View {
         GlassContainer(cornerRadius: height / 2) {
@@ -11,12 +12,17 @@ struct MiniPlayerView: View {
 
                 Spacer(minLength: 0)
 
+                Button(action: { showQueue = true }) {
+                    Image(systemName: "list.bullet")
+                        .foregroundStyle(.primary)
+                        .frame(width: 28, height: 28)
+                }
+
                 Button(action: { player.togglePlayPause() }) {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                         .foregroundStyle(.primary)
                         .frame(width: 28, height: 28)
                 }
-                .padding(.trailing, 8)
 
                 Button(action: { player.next() }) {
                     Image(systemName: "forward.fill")

@@ -148,6 +148,14 @@ final class PlayerManager: ObservableObject {
         isFavorited.toggle()
     }
 
+    func playSong(at index: Int) {
+        guard queue.indices.contains(index) else { return }
+        currentSong = queue[index]
+        progress = 0
+        loadArtwork()
+        play()
+    }
+
     private func loadAVPlayer() {
         guard let url = currentSong?.audioURL else { return }
         cleanupPlayer()

@@ -3,27 +3,21 @@ import UIKit
 
 struct GlassContainer<Content: View>: View {
     var cornerRadius: CGFloat = 18
-    @Environment(\.colorScheme) var colorScheme
     @ViewBuilder var content: () -> Content
 
     var body: some View {
-        Group {
-            if #available(iOS 26, *) {
+        if #available(iOS 26, *) {
+            GlassEffectContainer {
                 content()
-                    .glassEffect()
-                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                    .background(
-                        Color.clear
-                            .background(.ultraThinMaterial)
-                            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                    )
-            } else {
-                ZStack {
-                    VisualEffect(effect: UIBlurEffect(style: colorScheme == .dark ? .dark : .light))
-                    content()
-                }
-                .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             }
+            .glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
+        } else {
+            ZStack {
+                Color.black.opacity(0.55)
+                VisualEffect(effect: UIBlurEffect(style: .systemMaterial))
+                content()
+            }
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         }
     }
 }
