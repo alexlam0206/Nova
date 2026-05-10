@@ -162,6 +162,7 @@ struct LibraryContent: View {
                 Text("Remove \"\(songToDelete?.title ?? "")\" from library and server?")
             }
             .task { await fetchLibrarySongs() }
+            .refreshable { await fetchLibrarySongs() }
         }
     }
 
